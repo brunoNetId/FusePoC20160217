@@ -134,6 +134,11 @@
       <artifactId>camel-jaxb</artifactId>
       <version>2.15.1.redhat-621084</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.camel</groupId>
+      <artifactId>camel-jackson</artifactId>
+      <version>2.15.1.redhat-621084</version>
+    </dependency>
   </dependencies>
   <repositories>
     <repository>

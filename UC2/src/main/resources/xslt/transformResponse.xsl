@@ -11,10 +11,8 @@
 	<xsl:output method="xml" indent="yes"/>
 	
 	<xsl:template match="/">
-		
 <PublicList>
-			<xsl:apply-templates/>
-		
+<xsl:apply-templates/>
 </PublicList>
 	</xsl:template>
 	
@@ -23,13 +21,9 @@
 	
 	
 	<xsl:template match="//customer[@type='user']">
-		
-<customer>
-			
-<name><xsl:value-of select="./name"/></name>
-			
-<email><xsl:value-of select="./email"/></email>
-		
+<customer>	
+  <name><xsl:value-of select="./name"/></name>
+  <email><xsl:value-of select="./email"/></email>
 </customer>
 	</xsl:template>
 

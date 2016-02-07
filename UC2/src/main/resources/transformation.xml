@@ -4,16 +4,16 @@
         <wildcard>false</wildcard>
     </configuration>
     <mapping>
-        <class-a>generated.ListCustomers</class-a>
-        <class-b>generated.PublicList</class-b>
+        <class-a>generated.GetCustomersResponse</class-a>
+        <class-b>jsoninput.JsonInput</class-b>
         <field>
             <a>customer</a>
-            <b>customer</b>
+            <b>PublicList</b>
         </field>
     </mapping>
     <mapping>
         <class-a>generated.TypeCustomer</class-a>
-        <class-b>generated.PublicList$Customer</class-b>
+        <class-b>jsoninput.PublicList</class-b>
         <field>
             <a>email</a>
             <b>email</b>

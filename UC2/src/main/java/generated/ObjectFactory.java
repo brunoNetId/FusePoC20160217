@@ -30,19 +30,19 @@ public class ObjectFactory {
     }
 
     /**
-     * Create an instance of {@link PublicList }
+     * Create an instance of {@link GetCustomersResponse }
      * 
      */
-    public PublicList createPublicList() {
-        return new PublicList();
+    public GetCustomersResponse createGetCustomersResponse() {
+        return new GetCustomersResponse();
     }
 
     /**
-     * Create an instance of {@link PublicList.Customer }
+     * Create an instance of {@link TypeCustomer }
      * 
      */
-    public PublicList.Customer createPublicListCustomer() {
-        return new PublicList.Customer();
+    public TypeCustomer createTypeCustomer() {
+        return new TypeCustomer();
     }
 
 }

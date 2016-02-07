@@ -32,6 +32,9 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 	*/
 	String esb = "netty-http:http://localhost:10000/esb";
 	
+	//expected JSON body
+	String expectedJson = "{\"PublicList\":[{\"name\":\"John\",\"email\":\"John@king.st\"},{\"name\":\"Lucy\",\"email\":\"lucy@newcourt.st\"}]}";
+	
 	private void startTestHarness() throws Exception
 	{
 		context.addRoutes(new RouteBuilder()
@@ -42,12 +45,12 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 				//This stub simulates the SOAP backend system providing a list of customers
 				from("netty-http:http://localhost:19999/customer")
 					.log("got request...")
-					.pollEnrich("file:src/data?noop=true&fileName=privateCustomers.xml")
-					.to("validator:schemas/customers.xsd")
+					.pollEnrich("file:src/data?noop=true&fileName=soapResponse.xml")
+					//.to("validator:schemas/customers.xsd")
 					.to("mock:soap-stub");
 
 				//This stub simulates there is a decoupled system serving XSLTs
-				//making it simple to replace transformation causing no impact on Fuse
+				//making it simple to replace transformation plus causing no impact on Fuse
 				from("netty-http:http://localhost:29999/xslt")
 					.log("serving xslt...")
 					.pollEnrich("file:src/data/xslt?noop=true&fileName=transformResponse.xsl")
@@ -71,8 +74,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 		//We simulate the user interface triggers a request
 		Exchange response = template.send(esb, request);
 		
-		//System.out.println(">>>>>>>>>>>>>>>>>> response:\n"+response.getIn().getBody(String.class));
-		
 		//set expectations
         MockEndpoint mockSoapStub = getMockEndpoint("mock:soap-stub");
         mockSoapStub.expectedMessageCount(1);
@@ -84,11 +85,8 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 		//Validate our expectations
 		assertMockEndpointsSatisfied();
 		
-		//expected JSON body back
-		String expected = "[{\"name\":\"John\",\"email\":\"John@king.st\"},{\"name\":\"Lucy\",\"email\":\"lucy@newcourt.st\"}]";
-		
-		//validate
-		assertEquals("response not matching", expected, response.getIn().getBody(String.class));
+		//validate JSON response
+		assertEquals("response not matching", expectedJson, response.getIn().getBody(String.class));
 	}
 	
 	@Test
@@ -106,8 +104,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 		//We simulate the user interface triggers a request
 		Exchange response = template.send(esb, request);
 		
-		//System.out.println(">>>>>>>>>>>>>>>>>> response:\n"+response.getIn().getBody(String.class));
-		
 		//set expectations
         MockEndpoint mockSoapStub = getMockEndpoint("mock:soap-stub");
         mockSoapStub.expectedMessageCount(1);
@@ -119,16 +115,12 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 		//Validate our expectations
 		assertMockEndpointsSatisfied();
 		
-		//expected JSON body back
-		String expected = "[{\"name\":\"John\",\"email\":\"John@king.st\"},{\"name\":\"Lucy\",\"email\":\"lucy@newcourt.st\"}]";
-		
-		//validate
-		assertEquals("response not matching", expected, response.getIn().getBody(String.class));
+		//validate JSON response
+		assertEquals("response not matching", expectedJson, response.getIn().getBody(String.class));
 	}
 	
 	//This test is currently disabled while waiting to complete this type of transformer
 	@Test
-	@Ignore
 	public void test03CamelRouteEndToEndMapper() throws Exception
 	{
 		//We configure the system to perform transformations using the GUI defined mapping
@@ -143,8 +135,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 		//We simulate the user interface triggers a request
 		Exchange response = template.send(esb, request);
 		
-		//System.out.println(">>>>>>>>>>>>>>>>>> response:\n"+response.getIn().getBody(String.class));
-		
 		//set expectations
         MockEndpoint mockSoapStub = getMockEndpoint("mock:soap-stub");
         mockSoapStub.expectedMessageCount(1);
@@ -156,11 +146,8 @@ public class CamelContextXmlTest extends CamelSpringTestSupport
 		//Validate our expectations
 		assertMockEndpointsSatisfied();
 		
-		//expected JSON body back
-		String expected = "[{\"name\":\"John\",\"email\":\"John@king.st\"},{\"name\":\"Lucy\",\"email\":\"lucy@newcourt.st\"}]";
-		
-		//validate
-		assertEquals("response not matching", expected, response.getIn().getBody(String.class));
+		//validate JSON response
+		assertEquals("response not matching", expectedJson, response.getIn().getBody(String.class));
 	}
 
 	
