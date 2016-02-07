@@ -41,7 +41,12 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 			public void configure() throws Exception
 			{
 				from("netty-http:http://localhost:19999/ms-dyn")
-					.to("direct:stub-recorder-ms");
+					.convertBodyTo(String.class)
+					.to("direct:stub-recorder-ms")
+					.choice().when().simple("${body} == 'invalid'")
+					.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
+					.setBody().simple("error response")
+					;
 			}
 		});
 	}
@@ -81,7 +86,9 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 					.to("file:src/data/manual/ms/fixed");
 				
 				from("direct:get-xml-node")
-					.setBody().xpath("string(//firstName)", String.class);
+					.log("body to parse: ${body}")
+					.setBody().xpath("string(//firstName)", String.class)
+					.log("xpath result: ${body}");
 			}
 		});
 	}
@@ -248,8 +255,9 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		}
 	}
 
+
 	@Test
-	public void test05CamelRouteWhenMsTransformationFails() throws Exception
+	public void test05CamelRouteWhenMsReturnsError() throws Exception
 	{
 		//start stub Microsoft Dynamics
 		startStubMsCrm();
@@ -259,15 +267,13 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		
 		//start harness
 		startTestHarness();
-		
-		//we simulate SalesForce publishes a 'new customer' event.
-		//String sample = (String)template.requestBody("direct:get-sample", "message1.xml");
-		//template.sendBody(salesForcePublisher, sample);
+   
+		//we simulate SalesForce publishes a corrupt event.
 		template.sendBody(salesForcePublisher, "invalid");
 		
 		//set expectations
         MockEndpoint mockMs = getMockEndpoint("mock:ms-crm");
-        mockMs.expectedMessageCount(0);
+        mockMs.expectedMessageCount(1);
         
 		//set expectations
         MockEndpoint mockSap = getMockEndpoint("mock:sap-ecc");
@@ -275,16 +281,18 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
         
         //set expectations
         MockEndpoint mockMsError = getMockEndpoint("mock:ms-error");
-        mockMsError.expectedMessageCount(1);
+        mockMsError.expectedMinimumMessageCount(1);
         
         //set expectations
         MockEndpoint mockSapError = getMockEndpoint("mock:sap-error");
         mockSapError.expectedMessageCount(0);
 		
+        //Thread.sleep(5000);
+        
 		// Validate our expectations
 		assertMockEndpointsSatisfied();
 	}
-
+	
 	@Test
 	public void test06CamelRouteWhenAdminFixesMsMessage() throws Exception
 	{

@@ -43,12 +43,7 @@
 
   <endpoint uri="netty-http:http://localhost:19999/ms-dyn" id="ms-crm-backend"/>
   <endpoint uri="netty-http:http://localhost:29999/sap-ecc" id="sap-cpp-backend"/>
-  
-  <endpoint uri="dozer:MsTransform?sourceModel=generated.Person&amp;targetModel=generated.Person&amp;marshalId=generated&amp;unmarshalId=generated&amp;mappingFile=transformation.xml" id="MsTransform"/>
- 
-  <dataFormats>
-    <jaxb contextPath="generated" id="generated"/>
-  </dataFormats>
+
   
   <route id="sf-listener">
     <from uri="activemq:Consumer.A.VirtualTopic.salesforce.newcustomer"/>
@@ -72,7 +67,7 @@
   
   <route id="ms-processor">
     <from uri="direct:ms-processor"/>
-    <to uri="direct:ms-transform"/>
+    <!-- <to uri="direct:ms-transform"/> -->
     <to uri="direct:ms-submit"/>
   </route>
   
@@ -80,34 +75,19 @@
     <from uri="file:src/data/manual/ms/fixed"/>
     <log message="new file to process..."/>
     <to uri="direct:ms-processor"/>
-  </route>  
-  
-  <route id="ms-transform">
-    <from uri="direct:ms-transform"/>
-    <doTry>
-    <to ref="MsTransform"/>
-    <log message="transforming data for MS"/>
-    <doCatch>
-   	<exception>javax.xml.stream.XMLStreamException</exception>
-   	<handled>
-   		<constant>true</constant>
-   	</handled>
-   	<log message="parse exception caught: ${exception.message}"/>
-   	<to uri="direct:report-ms-error"/>
-   	<to uri="file:src/data/manual/ms/failed"/>
-   	<stop/>
-    </doCatch>
-    </doTry>
   </route>
-  
+
   <route id="ms-submit">
     <from uri="direct:ms-submit"/>
     <to uri="log:foo?showHeaders=true&amp;showProperties=true&amp;multiline=true"/>
     <doTry>
+      <setProperty propertyName="original.body">
+      	<simple>${body}</simple>
+      </setProperty>
       <to ref="ms-crm-backend"/>
       <log message="MS DONE !!"/>
       <doCatch>
-        <exception>java.lang.Exception</exception>
+        <exception>java.net.ConnectException</exception>
         <handled>
           <constant>false</constant>
         </handled>
@@ -117,6 +97,21 @@
           <constant>2000</constant>
         </delay>
       </doCatch>
+      
+      <doCatch>
+        <exception>java.lang.Exception</exception>
+        <handled>
+          <constant>true</constant>
+        </handled>
+        <log message="got other error ${exception.message} ${exception.stacktrace}"/>
+        <to uri="direct:report-ms-error"/>
+        <setBody>
+        	<simple>${property.original.body}</simple>
+        </setBody>
+        <to uri="file:src/data/manual/ms/failed"/>
+        <stop/>
+      </doCatch>
+      
     </doTry>
     <log message="successfully submited to MS-CRM !!"/>
   </route>
