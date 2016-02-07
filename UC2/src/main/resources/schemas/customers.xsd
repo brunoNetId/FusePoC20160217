@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:element name="ListCustomers">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element maxOccurs="unbounded" name="customer" type="typeCustomer"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	<xs:complexType name="typeCustomer">
+		<xs:sequence>
+			<xs:element maxOccurs="1" name="name" type="xs:string"/>
+			<xs:element maxOccurs="1" name="address" type="xs:string"/>
+			<xs:element maxOccurs="1" name="email" type="xs:string"/>
+			<xs:element maxOccurs="1" name="country" type="xs:string"/>
+		</xs:sequence>
+		<xs:attribute name="type" use="required">
+			<xs:simpleType>
+				<xs:restriction base="xs:string">
+					<xs:pattern value="user|partner"/>
+				</xs:restriction>
+			</xs:simpleType>
+		</xs:attribute>
+	</xs:complexType>
+</xs:schema>

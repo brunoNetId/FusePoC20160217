@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PublicList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+       <customer>
+              <name>John</name>
+              <email>John@king.st</email>
+          </customer>
+       <customer>
+              <name>Lucy</name>
+              <email>lucy@newcourt.st</email>
+          </customer>
+   </PublicList>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configures the Camel Context-->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:amq="http://activemq.apache.org/schema/core"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+       http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
+
+
+
+	<bean id="shutdown" class="org.apache.camel.impl.DefaultShutdownStrategy">  
+		<property name="timeout" value="3"/>
+	</bean> 
+
+  	<bean id="debugger" class="com.inmarsat.uc2.Debugger"/>
+  
+  
+<camelContext xmlns="http://camel.apache.org/schema/spring">
+
+  <endpoint uri="netty-http:http://localhost:10000/esb" id="esb-listener"/>
+  <endpoint uri="netty-http:http://localhost:19999/customer" id="soap-backend"/>
+  <endpoint uri="netty-http:http://localhost:29999/xslt" id="xslt-backend"/>
+  
+  <endpoint uri="dozer:canonicalXml?sourceModel=generated.ListCustomers&amp;targetModel=generated.PublicList&amp;marshalId=generated&amp;unmarshalId=generated&amp;mappingFile=transformation.xml" id="canonicalXml"/>
+  <endpoint uri="dozer:t01?sourceModel=generated.ListCustomers&amp;targetModel=generated.PublicList&amp;marshalId=generated&amp;unmarshalId=generated&amp;mappingFile=transf1.xml" id="t01"/>
+  
+  <dataFormats>
+    <xmljson id="xmljson"/>
+    <xmljson forceTopLevelObject="true" rootName="newRoot" trimSpaces="true" skipNamespaces="true" removeNamespacePrefixes="true" expandableProperties="d e" id="xmljsonWithOptions"/>
+    <jaxb contextPath="generated" id="generated"/>
+  </dataFormats>
+ 
+  <route id="http-listener">
+    <from ref="esb-listener"/>
+    <log message="got new request..."/>
+    <to uri="direct:process"/>
+  </route> 
+  
+  <route id="processor">
+    <from uri="direct:process"/>
+    <to uri="direct:invoke-backend"/>
+    <to uri="direct:transform"/>
+    <log message="after transformation: ${body}"/>
+    <marshal ref="xmljson"/>
+    <log message="xmljson: ${body}"/>
+  </route>
+
+  <route id="invoke-backend">
+    <from uri="direct:invoke-backend"/>
+    <log message="calling SOAP server..."/>
+    <to ref="soap-backend"/>
+    <convertBodyTo type="java.lang.String"/>
+    <log message="got response from SOAP server: ${body}"/>
+    <to uri="validator:schemas/customers.xsd"/>
+  </route>
+
+  <route id="transform">
+    <from uri="direct:transform"/>
+    <doTry>
+    	<setProperty propertyName="mode"><simple>${properties:transform.mode}</simple></setProperty>
+    <doCatch>
+    	<exception>java.lang.Exception</exception>
+    	<handled><constant>true</constant></handled>
+    	<log message="trasform mode config not resolved, will use default mode."/>
+    </doCatch>
+    </doTry>
+    <log message="transforming data... ${property.mode}"/>
+    <choice>
+      <when>
+        <simple>${property.mode} == 'remote'</simple>
+        <recipientList>
+        	<simple>xslt:http://localhost:29999/xslt</simple>
+        </recipientList>
+        <to uri="validator:schemas/public.xsd"/>
+      </when>
+      <when>
+        <simple>${property.mode} == 'data-mapper'</simple>
+        <log message="to do..."/>
+        <to ref="canonicalXml"/>
+      </when>
+      <otherwise>
+        <to uri="xslt:xslt/transformResponse.xsl?saxon=true"/>
+        <to uri="validator:schemas/public.xsd"/>
+      </otherwise>
+    </choice>
+  </route>
+  
+<!--   
+  <route id="soap-stub">
+    <from ref="soap-backend"/>
+    <log message="got request..."/>
+    <pollEnrich uri="file:src/data?noop=true&amp;fileName=privateCustomers.xml"/>
+    <to uri="validator:schemas/customers.xsd"/>
+    <to uri="mock:soap-stub"/>
+  </route>
+ 
+  <route id="xslt-server">
+    <from ref="xslt-backend"/>
+    <log message="serving xslt..."/>
+    <to uri="log:server?showAll=true"/>
+    <pollEnrich uri="file:src/data/xslt?noop=true&amp;fileName=transformResponse.xsl"/>
+    <to uri="mock:xslt-stub"/>
+  </route>  -->
+  
+</camelContext>
+
+</beans>
