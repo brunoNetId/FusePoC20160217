@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding" xmlns:soap="http://www.w3.org/2003/05/soap-envelope/">
+	<soap:Body>
+		<GetCustomersResponse>
+			<customer type="user">
+				<name>John</name>
+				<address>King's st.</address>
+				<email>John@king.st</email>
+				<country>UK</country>
+			</customer>
+			<customer type="user">
+				<name>Lucy</name>
+				<address>Newcourt St.</address>
+				<email>lucy@newcourt.st</email>
+				<country>UK</country>
+			</customer>
+		</GetCustomersResponse>
+	</soap:Body>
+</soap:Envelope>

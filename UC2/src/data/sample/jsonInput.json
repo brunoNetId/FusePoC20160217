@@ -1,0 +1,12 @@
+{
+  "PublicList": [
+    {
+      "name": "John",
+      "email": "John@king.st"
+    },
+    {
+      "name": "Lucy",
+      "email": "lucy@newcourt.st"
+    }
+  ]
+}
