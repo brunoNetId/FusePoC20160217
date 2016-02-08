@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configures the Camel Context-->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:amq="http://activemq.apache.org/schema/core"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+       http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
+
+	<!-- This creates an embedded ActiveMQ Broker -->
+ 	<broker xmlns="http://activemq.apache.org/schema/core" useJmx="true" persistent="false">
+	  <transportConnectors>
+	    <transportConnector uri="tcp://localhost:61616" />
+	  </transportConnectors>
+	</broker>
+ 
+
+</beans>

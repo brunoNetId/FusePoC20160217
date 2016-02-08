@@ -6,6 +6,7 @@
   <artifactId>uc1</artifactId>
   <version>1.0</version>
   <name>ActiveMQ embedded with Camel</name>
+  <packaging>bundle</packaging>
   <url>http://www.myorganization.org</url>
   <properties>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -161,6 +162,29 @@
   <build>
     <defaultGoal>install</defaultGoal>
     <plugins>
+                <!-- build the OSGi bundle -->
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Export-Package>
+                            com.redhat.gpe.training.camel*
+                        </Export-Package>
+                        <!-- we must set the version for org.slf4j explicitly, to match that used in JBoss Fuse -->
+                        <Import-Package>
+                            <!-- org.slf4j;version=1.7.10, -->
+                            org.apache.camel.component.jms,
+                            org.apache.activemq,
+                            org.springframework.jms.connection,
+                            org.apache.camel.converter.jaxb,
+                            *
+                        </Import-Package>
+                    </instructions>
+                </configuration>
+            </plugin>
+    
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>2.5.1</version>

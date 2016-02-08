@@ -10,12 +10,12 @@
        http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
 
 	<!-- This creates an embedded ActiveMQ Broker -->
-	<broker xmlns="http://activemq.apache.org/schema/core" useJmx="true" persistent="false">
+<!-- 	<broker xmlns="http://activemq.apache.org/schema/core" useJmx="true" persistent="false">
 	  <transportConnectors>
 	    <transportConnector uri="tcp://localhost:61616" />
 	  </transportConnectors>
 	</broker>
-
+ -->
     <bean id="jmsTransactionManager" class="org.springframework.jms.connection.JmsTransactionManager">
         <property name="connectionFactory" ref="jmsConnectionFactory"/>
     </bean>
@@ -23,6 +23,8 @@
     <bean id="jmsConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
         <property name="brokerURL"
                   value="tcp://localhost:61616?jms.redeliveryPolicy.maximumRedeliveries=-1&amp;jms.redeliveryPolicy.initialRedeliveryDelay=2000"/>
+        <property name="userName" value="admin"/>
+        <property name="password" value="admin"/>
     </bean>
 
     <bean name="activemq" class="org.apache.camel.component.jms.JmsComponent">
@@ -39,8 +41,13 @@
   
   
   
-<camelContext xmlns="http://camel.apache.org/schema/spring">
+<camelContext xmlns="http://camel.apache.org/schema/spring" id="uc1">
 
+  <packageScan>
+      <package>com.inmarsat.uc1.stubs</package>
+  </packageScan>
+  
+  
   <endpoint uri="netty-http:http://localhost:19999/ms-dyn" id="ms-crm-backend"/>
   <endpoint uri="netty-http:http://localhost:29999/sap-ecc" id="sap-cpp-backend"/>
 

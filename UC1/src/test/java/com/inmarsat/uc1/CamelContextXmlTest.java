@@ -30,49 +30,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	protected Endpoint salesForcePublisher;
 	
 	
-	private void startStubMsCrm() throws Exception
-	{
-		context.addRoutes(new RouteBuilder()
-		{
-			@Override
-			public void configure() throws Exception
-			{
-				//This stub simulates Microsoft Dynamics
-				//It can be configured to validate XML against Schema v1 or against v2.
-				from("netty-http:http://localhost:19999/ms-dyn")
-					.onException(org.apache.camel.processor.validation.SchemaValidationException.class)
-						.log("MS Schema ${properties:ms-stub-schema-version} validation failure.")
-						.handled(true)
-						.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
-						.setBody().simple("invalid data")
-						.end()
-					.convertBodyTo(String.class)
-					.to("direct:stub-recorder-ms")
-					.log("MS validating with Schema ${properties:ms-stub-schema-version}.")
-					.choice()
-						.when().simple("${properties:ms-stub-schema-version} == 'v2'")
-							.to("validator:schema/ms-stub-v2.xsd")
-						.otherwise()
-							.to("validator:schema/ms-stub-v1.xsd")
-					.end();
-			}
-		});
-	}
-	
-	private void startStubSapEcc() throws Exception
-	{
-		context.addRoutes(new RouteBuilder()
-		{
-			@Override
-			public void configure() throws Exception
-			{
-				//This stub simulates SAP ECC
-				from("netty-http:http://localhost:29999/sap-ecc")
-					.to("direct:stub-recorder-sap");
-			}
-		});
-	}
-	
 	private void startTestHarness() throws Exception
 	{
 		//Configures default MS Schema validation version
@@ -83,13 +40,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 			@Override
 			public void configure() throws Exception
 			{
-				//keeps track of received messages in MS
-				from("direct:stub-recorder-ms")
-					.to("mock:ms-crm");
-				
-				//keeps track of received messages in SAP
-				from("direct:stub-recorder-sap")
-					.to("mock:sap-ecc");
 				
 				//gets an XML sample v1 or v2
 				from("direct:get-sample")
@@ -122,13 +72,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	
 	@Test
 	public void test01CamelRouteWhenMsCrmAndSapEccAreUp() throws Exception
-	{
-		//start stub Microsoft Dynamics
-		startStubMsCrm();
-		
-		//start stub SAP ECC
-		startStubSapEcc();
-		
+	{	
 		//start harness
 		startTestHarness();
 		
@@ -159,11 +103,8 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	@Test
 	public void test02CamelRouteWhenMsIsDown() throws Exception
 	{
-		//we simulate there is no MS Dynamics server running
-		//startStubMsCrm();
-		
-		//start stub SAP ECC
-		startStubSapEcc();
+		//we stop the MS Dynamics server
+		context.stopRoute("stub-ms-dynamics");
 		
 		//start harness
 		startTestHarness();
@@ -196,12 +137,9 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	
 	@Test
 	public void test03CamelRouteWhenMsIsDownAndComesBackUp() throws Exception
-	{	
-		//we simulate there is no MS Dynamics server running
-		//startStubMsCrm();
-		
-		//start stub SAP ECC
-		startStubSapEcc();
+	{
+		//we stop the MS Dynamics server
+		context.stopRoute("stub-ms-dynamics");
 		
 		//start harness
 		startTestHarness();
@@ -230,7 +168,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
         Thread.sleep(5000);
         
 		//we now kick off MS Dynamics to simulate it comes back online
-		startStubMsCrm();
+		context.startRoute("stub-ms-dynamics");
         
 		//Validate our expectations
 		assertMockEndpointsSatisfied();
@@ -240,12 +178,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	@Test
 	public void test04OrderIsMaintained() throws Exception
 	{
-		//start stub Microsoft Dynamics
-		startStubMsCrm();
-		
-		//start stub SAP ECC
-		startStubSapEcc();
-
 		//start harness
 		startTestHarness();
 		
@@ -286,12 +218,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	@Test
 	public void test05CamelRouteWhenMsReturnsError() throws Exception
 	{
-		//start stub Microsoft Dynamics
-		startStubMsCrm();
-		
-		//start stub SAP ECC
-		startStubSapEcc();
-		
 		//start harness
 		startTestHarness();
    
@@ -328,12 +254,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	@Test
 	public void test06CamelRouteManualRetryMechanism() throws Exception
 	{
-		//start stub Microsoft Dynamics
-		startStubMsCrm();
-		
-		//start stub SAP ECC
-		startStubSapEcc();
-		
 		//start harness
 		startTestHarness();
 		
@@ -366,12 +286,6 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	@Test
 	public void test07CamelRouteDeliveryFailsAndAdminRetriesMsMessage() throws Exception
 	{
-		//start stub Microsoft Dynamics
-		startStubMsCrm();
-		
-		//start stub SAP ECC
-		startStubSapEcc();
-		
 		//start harness
 		startTestHarness();
 		
@@ -428,7 +342,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	@Override
 	protected ClassPathXmlApplicationContext createApplicationContext() {
 		return new ClassPathXmlApplicationContext(
-				"META-INF/spring/camel-context.xml");
+				"META-INF/spring/camel-context.xml","META-INF/spring/local/broker.xml");
 	}
 
 }
