@@ -25,13 +25,10 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
  */
 public class CamelContextXmlTest extends CamelSpringTestSupport {
 
-	
+	//endpoint to simulate SalesForce pushes new events
 	@EndpointInject(uri = "activemq:topic:VirtualTopic.salesforce.newcustomer")
 	protected Endpoint salesForcePublisher;
-
-/*	@EndpointInject(uri = "netty-http:http://localhost:19999/ms-dyn")
-	protected Endpoint microsoftDynamicsStub;
-*/	
+	
 	
 	private void startStubMsCrm() throws Exception
 	{
@@ -40,13 +37,24 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 			@Override
 			public void configure() throws Exception
 			{
+				//This stub simulates Microsoft Dynamics
+				//It can be configured to validate XML against Schema v1 or against v2.
 				from("netty-http:http://localhost:19999/ms-dyn")
+					.onException(org.apache.camel.processor.validation.SchemaValidationException.class)
+						.log("MS Schema ${properties:ms-stub-schema-version} validation failure.")
+						.handled(true)
+						.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
+						.setBody().simple("invalid data")
+						.end()
 					.convertBodyTo(String.class)
 					.to("direct:stub-recorder-ms")
-					.choice().when().simple("${body} == 'invalid'")
-					.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
-					.setBody().simple("error response")
-					;
+					.log("MS validating with Schema ${properties:ms-stub-schema-version}.")
+					.choice()
+						.when().simple("${properties:ms-stub-schema-version} == 'v2'")
+							.to("validator:schema/ms-stub-v2.xsd")
+						.otherwise()
+							.to("validator:schema/ms-stub-v1.xsd")
+					.end();
 			}
 		});
 	}
@@ -58,6 +66,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 			@Override
 			public void configure() throws Exception
 			{
+				//This stub simulates SAP ECC
 				from("netty-http:http://localhost:29999/sap-ecc")
 					.to("direct:stub-recorder-sap");
 			}
@@ -66,25 +75,43 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 	
 	private void startTestHarness() throws Exception
 	{
+		//Configures default MS Schema validation version
+		System.setProperty("ms-stub-schema-version", "v1");
+		
 		context.addRoutes(new RouteBuilder()
 		{
 			@Override
 			public void configure() throws Exception
-			{			
+			{
+				//keeps track of received messages in MS
 				from("direct:stub-recorder-ms")
 					.to("mock:ms-crm");
 				
+				//keeps track of received messages in SAP
 				from("direct:stub-recorder-sap")
 					.to("mock:sap-ecc");
 				
+				//gets an XML sample v1 or v2
 				from("direct:get-sample")
-					.pollEnrich("file:src/data?noop=true&fileName=${body}")
+					.choice()
+						.when().simple("${body} == 'v2'")
+							.pollEnrich("file:src/data?noop=true&fileName=message1_v2.xml")
+						.otherwise()
+							.pollEnrich("file:src/data?noop=true&fileName=message1.xml")
+					.end()
 					.convertBodyTo(String.class);
 
-				from("direct:simulate-manual-fix")
-					.pollEnrich("file:src/data?noop=true&fileName=${body}")
-					.to("file:src/data/manual/ms/fixed");
+				//helper to simulate a manual retry v1 or v2
+				from("direct:simulate-manual-retry")
+					.choice()
+						.when().simple("${body} == 'v2'")
+							.pollEnrich("file:src/data?noop=true&fileName=message1_v2.xml")
+						.otherwise()
+							.pollEnrich("file:src/data?noop=true&fileName=message1.xml")
+					.end()
+					.to("file:src/data/manual/ms/retry");
 				
+				//gets the node inside the XML
 				from("direct:get-xml-node")
 					.log("body to parse: ${body}")
 					.setBody().xpath("string(//firstName)", String.class)
@@ -106,7 +133,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		startTestHarness();
 		
 		//we simulate SalesForce publishes a 'new customer' event.
-		String sample = (String)template.requestBody("direct:get-sample", "message1.xml");
+		String sample = (String)template.requestBody("direct:get-sample", "v1");
 		template.sendBody(salesForcePublisher, sample);
 		
 		//set expectations
@@ -125,7 +152,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
         MockEndpoint mockSapError = getMockEndpoint("mock:sap-error");
         mockSapError.expectedMessageCount(0);
 		
-		// Validate our expectations
+		//Validate our expectations
 		assertMockEndpointsSatisfied();
 	}
 
@@ -142,7 +169,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		startTestHarness();
    
 		//we simulate SalesForce publishes a 'new customer' event.
-		String sample = (String)template.requestBody("direct:get-sample", "message1.xml");
+		String sample = (String)template.requestBody("direct:get-sample", "v1");
 		template.sendBody(salesForcePublisher, sample);
 		
 		//set expectations
@@ -163,7 +190,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		
         //Thread.sleep(5000);
         
-		// Validate our expectations
+		//Validate our expectations
 		assertMockEndpointsSatisfied();
 	}
 	
@@ -180,7 +207,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		startTestHarness();
 
 		//we simulate SalesForce publishes a 'new customer' event.
-		String sample = (String)template.requestBody("direct:get-sample", "message1.xml");
+		String sample = (String)template.requestBody("direct:get-sample", "v1");
 		template.sendBody(salesForcePublisher, sample);
 		
 		//set expectations
@@ -205,7 +232,7 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		//we now kick off MS Dynamics to simulate it comes back online
 		startStubMsCrm();
         
-		// Validate our expectations
+		//Validate our expectations
 		assertMockEndpointsSatisfied();
 	}
 	
@@ -226,10 +253,10 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		List<String> bodies = new ArrayList<String>();
 		for(int i=0; i<10 ; i++)
 		{
-			String newBody = "<person><firstName>customer-"+i+"</firstName><lastName>Smith</lastName><city>New York</city></person>";
-			bodies.add(newBody);
+			String newBodyV1 = "<person><firstName>customer-"+i+"</firstName><lastName>Smith</lastName><city>New York</city></person>";
+			bodies.add(newBodyV1);
 			
-			template.sendBody(salesForcePublisher, newBody);
+			template.sendBody(salesForcePublisher, newBodyV1);
 		}
 		
 		MockEndpoint mockMs = getMockEndpoint("mock:ms-crm");
@@ -268,8 +295,9 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		//start harness
 		startTestHarness();
    
-		//we simulate SalesForce publishes a corrupt event.
-		template.sendBody(salesForcePublisher, "invalid");
+		//we simulate SalesForce publishes an event with a new field (version 2).
+		String sample = (String)template.requestBody("direct:get-sample", "v2");
+		template.sendBody(salesForcePublisher, sample);
 		
 		//set expectations
         MockEndpoint mockMs = getMockEndpoint("mock:ms-crm");
@@ -281,20 +309,24 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
         
         //set expectations
         MockEndpoint mockMsError = getMockEndpoint("mock:ms-error");
-        mockMsError.expectedMinimumMessageCount(1);
+        mockMsError.expectedMessageCount(1);
         
         //set expectations
         MockEndpoint mockSapError = getMockEndpoint("mock:sap-error");
         mockSapError.expectedMessageCount(0);
+        
+        //set expectations
+        MockEndpoint mockAlertAdmin = getMockEndpoint("mock:alert-admin");
+        mockAlertAdmin.expectedMessageCount(1);
 		
         //Thread.sleep(5000);
         
-		// Validate our expectations
+		//Validate our expectations
 		assertMockEndpointsSatisfied();
 	}
 	
 	@Test
-	public void test06CamelRouteWhenAdminFixesMsMessage() throws Exception
+	public void test06CamelRouteManualRetryMechanism() throws Exception
 	{
 		//start stub Microsoft Dynamics
 		startStubMsCrm();
@@ -305,8 +337,8 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
 		//start harness
 		startTestHarness();
 		
-		//we simulate an Admin has manually submitted a fixed file.
-		template.sendBody("direct:simulate-manual-fix", "message1.xml");
+		//we simulate an Admin has manually triggered a retry action.
+		template.sendBody("direct:simulate-manual-retry", "v1");
 		
 		//set expectations
         MockEndpoint mockMs = getMockEndpoint("mock:ms-crm");
@@ -323,11 +355,75 @@ public class CamelContextXmlTest extends CamelSpringTestSupport {
         //set expectations
         MockEndpoint mockSapError = getMockEndpoint("mock:sap-error");
         mockSapError.expectedMessageCount(0);
+        
+        //We allow some time for the processing to finish
+        Thread.sleep(2000);
 		
-		// Validate our expectations
+		//Validate our expectations
 		assertMockEndpointsSatisfied();
 	}
 	
+	@Test
+	public void test07CamelRouteDeliveryFailsAndAdminRetriesMsMessage() throws Exception
+	{
+		//start stub Microsoft Dynamics
+		startStubMsCrm();
+		
+		//start stub SAP ECC
+		startStubSapEcc();
+		
+		//start harness
+		startTestHarness();
+		
+		//we simulate SalesForce publishes an event with a new field (version 2).
+		String sampleV2 = (String)template.requestBody("direct:get-sample", "v2");
+		template.sendBody(salesForcePublisher, sampleV2);
+		
+		//set expectations
+        MockEndpoint mockMs = getMockEndpoint("mock:ms-crm");
+        mockMs.expectedMessageCount(1);
+        
+		//set expectations
+        MockEndpoint mockSap = getMockEndpoint("mock:sap-ecc");
+        mockSap.expectedMessageCount(1);
+        
+        //set expectations
+        MockEndpoint mockMsError = getMockEndpoint("mock:ms-error");
+        mockMsError.expectedMessageCount(1);
+        
+        //set expectations
+        MockEndpoint mockSapError = getMockEndpoint("mock:sap-error");
+        mockSapError.expectedMessageCount(0);
+        
+        //set expectations
+        MockEndpoint mockAlertAdmin = getMockEndpoint("mock:alert-admin");
+        mockAlertAdmin.expectedMessageCount(1);
+        
+		//Validate our expectations
+		assertMockEndpointsSatisfied();
+		
+		//We reconfigure the MS Stub to validate against Schema v2
+		//This simulates the Admin received an alert, reviewed the failed message
+		//then added the new attribute in the CRM system which will now understand v2
+		System.setProperty("ms-stub-schema-version", "v2");
+		
+		//we reset expectations
+		mockMs.reset();
+		mockMs.expectedMessageCount(1);
+		
+		//we reset expectations
+		mockMsError.reset();
+		mockMsError.expectedMessageCount(0);
+		
+		//we simulate the Admin manually retries the same message that previously failed
+		template.sendBody("file:src/data/manual/ms/retry", sampleV2);
+		
+		//we wait a bit to allow processing to finish
+		Thread.sleep(2000);
+		
+		//Validate our expectations
+		assertMockEndpointsSatisfied();
+	}
 	
 	@Override
 	protected ClassPathXmlApplicationContext createApplicationContext() {

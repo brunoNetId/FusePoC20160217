@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <person user="james">
+  <title>Mr.</title>
   <firstName>James</firstName>
   <lastName>Strachan</lastName>
   <city>London</city>

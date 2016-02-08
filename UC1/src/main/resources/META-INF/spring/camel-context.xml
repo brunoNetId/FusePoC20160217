@@ -72,7 +72,7 @@
   </route>
   
   <route id="manual-retries">
-    <from uri="file:src/data/manual/ms/fixed"/>
+    <from uri="file:src/data/manual/ms/retry"/>
     <log message="new file to process..."/>
     <to uri="direct:ms-processor"/>
   </route>
@@ -109,6 +109,7 @@
         	<simple>${property.original.body}</simple>
         </setBody>
         <to uri="file:src/data/manual/ms/failed"/>
+        <to uri="mock:alert-admin"/>
         <stop/>
       </doCatch>
       
