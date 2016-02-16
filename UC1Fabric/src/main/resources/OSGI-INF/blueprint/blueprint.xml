@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:amq="http://activemq.apache.org/schema/core"
+       xsi:schemaLocation="
+       http://www.osgi.org/xmlns/blueprint/v1.0.0 http://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd
+       http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd
+       http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
+
+  <bean id="helloBean" class="com.mycompany.camel.blueprint.HelloBean">
+      <property name="say" value="Hi from Camel"/>
+  </bean>
+
+  <broker xmlns="http://activemq.apache.org/schema/core" useJmx="true" persistent="false">
+    <transportConnectors>
+      <transportConnector uri="tcp://localhost:61619" />
+    </transportConnectors>
+  </broker>  
+
+    <bean id="jmsTransactionManager" class="org.springframework.jms.connection.JmsTransactionManager">
+        <property name="connectionFactory" ref="jmsConnectionFactory"/>
+    </bean>
+    
+    <bean id="jmsConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+        <property name="brokerURL"
+                  value="tcp://localhost:61619?jms.redeliveryPolicy.maximumRedeliveries=-1&amp;jms.redeliveryPolicy.initialRedeliveryDelay=2000"/>
+        <property name="userName" value="admin"/>
+        <property name="password" value="admin"/>
+    </bean>
+    
+    <bean id="activemq" class="org.apache.camel.component.jms.JmsComponent">
+        <property name="connectionFactory" ref="jmsConnectionFactory"/>
+        <property name="transactionManager" ref="jmsTransactionManager"/>
+        <property name="transacted" value="true"/>
+    </bean>
+
+	<bean id="shutdown" class="org.apache.camel.impl.DefaultShutdownStrategy">  
+		<property name="timeout" value="3"/>
+	</bean>
+	
+  	
+  	<bean id="debugger" class="com.inmarsat.uc1.Debugger"/>
+
+  
+  <camelContext xmlns="http://camel.apache.org/schema/blueprint">
+  
+  
+  <packageScan>
+      <package>com.inmarsat.uc1.stubs</package>
+  </packageScan>
+  
+  
+  <endpoint uri="netty-http:http://localhost:19999/ms-dyn" id="ms-crm-backend"/>
+  <endpoint uri="netty-http:http://localhost:29999/sap-ecc" id="sap-cpp-backend"/>
+  
+    <route id="timerToLog">
+      <from uri="timer:foo?period=5000"/>
+      <setBody>
+          <method ref="helloBean" method="hello"/>
+      </setBody>
+      <log message="The message contains ${body}"/>
+      <to uri="mock:result"/>
+    </route>
+    
+    
+  <route id="sf-listener">
+    <from uri="activemq:Consumer.A.VirtualTopic.salesforce.newcustomer"/>
+    <log message="consuming event from topic... ${body}"/>
+    <to uri="direct:process-sf-event"/>
+  </route>
+  
+  <route id="sf-dispatcher">
+    <from uri="direct:process-sf-event"/>
+    <log message="posting MS-CRM event to queue..."/>
+    <to uri="activemq:ms-crm"/>
+    <log message="posting SAP-ECC event to queue..."/>
+    <to uri="activemq:sap-ecc"/>
+  </route>
+  
+  <route id="ms-listener">
+    <from uri="activemq:ms-crm"/>
+    <log message="consuming MS-CRM event from queue..."/>
+    <to uri="direct:ms-processor"/>
+  </route>
+  
+  <route id="ms-processor">
+    <from uri="direct:ms-processor"/>
+    <!-- <to uri="direct:ms-transform"/> -->
+    <to uri="direct:ms-submit"/>
+  </route>
+  
+  <route id="manual-retries">
+    <from uri="file:src/data/manual/ms/retry"/>
+    <log message="new file to process..."/>
+    <to uri="direct:ms-processor"/>
+  </route>
+
+  <route id="ms-submit">
+    <from uri="direct:ms-submit"/>
+    <to uri="log:foo?showHeaders=true&amp;showProperties=true&amp;multiline=true"/>
+    <doTry>
+      <setProperty propertyName="original.body">
+      	<simple>${body}</simple>
+      </setProperty>
+      <to ref="ms-crm-backend"/>
+      <log message="MS DONE !!"/>
+      <doCatch>
+        <exception>java.net.ConnectException</exception>
+        <handled>
+          <constant>false</constant>
+        </handled>
+        <log message="failed HTTP request"/>
+        <to uri="direct:report-ms-error"/>
+        <delay>
+          <constant>2000</constant>
+        </delay>
+      </doCatch>
+      
+      <doCatch>
+        <exception>java.lang.Exception</exception>
+        <handled>
+          <constant>true</constant>
+        </handled>
+        <log message="got other error ${exception.message} ${exception.stacktrace}"/>
+        <to uri="direct:report-ms-error"/>
+        <setBody>
+        	<simple>${property.original.body}</simple>
+        </setBody>
+        <to uri="file:src/data/manual/ms/failed"/>
+        <to uri="mock:alert-admin"/>
+        <stop/>
+      </doCatch>
+      
+    </doTry>
+    <log message="successfully submited to MS-CRM !!"/>
+  </route>
+  
+  <route id="sap-processor">
+    <from uri="activemq:sap-ecc"/>
+    <log message="consuming SAP-ECC event from queue..."/>
+    <doTry>
+      <to ref="sap-cpp-backend"/>
+      <log message="SAP DONE !!"/>
+      <doCatch>
+        <exception>java.lang.Exception</exception>
+        <handled>
+          <constant>false</constant>
+        </handled>
+        <log message="failed HTTP request"/>
+        <to uri="direct:report-sap-error"/>
+        <delay>
+          <constant>2000</constant>
+        </delay>
+      </doCatch>
+    </doTry>
+    <log message="successfully submited to SAP !!"/>
+  </route>
+  
+  <route id="reporting-ms-error">
+    <from uri="direct:report-ms-error"/>
+    <to uri="mock:ms-error"/>
+  </route>
+  
+  <route id="reporting-sap-error">
+    <from uri="direct:report-sap-error"/>
+    <to uri="mock:sap-error"/>
+  </route>
+    
+    
+    
+  </camelContext>
+
+</blueprint>
